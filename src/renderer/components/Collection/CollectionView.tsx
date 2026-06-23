@@ -183,7 +183,7 @@ export function CollectionView() {
     // Queue a single collection item (album or track); returns how many tracks were queued.
     const enqueueItem = async (item: CollectionItem, playNext: boolean): Promise<number> => {
       if (item.type === 'album' && item.album) {
-        const album = await hydrateAlbum(item.album as Album);
+        const album = await hydrateAlbum(item.album);
         if (album.tracks && album.tracks.length > 0) {
           await addAlbumToQueue(album, playNext);
           return album.tracks.length;
@@ -239,7 +239,7 @@ export function CollectionView() {
               if (item.type === 'track' && item.track) {
                 allTracks.push(item.track);
               } else if (item.type === 'album' && item.album) {
-                const albumWithTracks = await hydrateAlbum(item.album as Album);
+                const albumWithTracks = await hydrateAlbum(item.album);
                 if (albumWithTracks.tracks && albumWithTracks.tracks.length > 0) {
                   allTracks.push(...albumWithTracks.tracks);
                 }
