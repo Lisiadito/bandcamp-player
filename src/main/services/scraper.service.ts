@@ -1065,6 +1065,14 @@ export class ScraperService extends EventEmitter {
    * Get full album details including tracks and stream URLs
    */
   async getAlbumDetails(albumUrl: string): Promise<Album | null> {
+    // Serve synthetic details for simulated albums (no network round-trip).
+    if (
+      simulationService.shouldSimulate() &&
+      simulationService.isSimulatedAlbumUrl(albumUrl)
+    ) {
+      return simulationService.getAlbumDetails(albumUrl);
+    }
+
     try {
       const config = remoteConfigService.get();
       const cookies = await this.authService.getSessionCookies();

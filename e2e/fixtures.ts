@@ -5,20 +5,35 @@ import { writeFileSync, mkdirSync, existsSync } from 'fs';
 type AppFixtures = {
     electronApp: ElectronApplication;
     window: Page;
+    // Opt-in option: launch the app with --simulate-large-collection so the
+    // real SimulationService feeds a 5000-item collection. Defaults to false,
+    // so existing specs are unaffected. Enable per-spec via test.use({ largeCollection: true }).
+    largeCollection: boolean;
 };
 
 export const test = base.extend<AppFixtures>({
-    electronApp: async ({ }, use, testInfo) => {
+    largeCollection: [false, { option: true }],
+    electronApp: async ({ largeCollection }, use, testInfo) => {
+        // Keep large-collection runs in a separate user-data-dir so the simulated
+        // SQLite cache never leaks into the small-collection specs sharing a worker.
+        const dirSuffix = largeCollection ? '-large' : '';
+        const args = [
+            join(__dirname, '../dist/main/main.js'),
+            `--user-data-dir=${join(__dirname, '../temp-test-data', testInfo.workerIndex.toString() + dirSuffix)}`
+        ];
+        if (largeCollection) {
+            args.push('--simulate-large-collection');
+        }
         const electronApp = await electron.launch({
-            args: [
-                join(__dirname, '../dist/main/main.js'),
-                `--user-data-dir=${join(__dirname, '../temp-test-data', testInfo.workerIndex.toString())}`
-            ],
+            args,
             env: {
                 ...process.env,
                 NODE_ENV: 'production',
                 E2E_TEST: 'true',
-                REMOTE_PORT: '0'
+                REMOTE_PORT: '0',
+                // Smaller-but-still-large collection for E2E: faster cold build than the
+                // 5000-item dev:large default, while staying well above the test threshold.
+                ...(largeCollection ? { SIMULATE_COLLECTION_SIZE: '1500' } : {}),
             },
         });
 
