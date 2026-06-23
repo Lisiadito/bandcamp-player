@@ -149,8 +149,8 @@ test.describe('Collection Bulk Actions', () => {
         await queueBtn.click();
         const clearBtn = window.getByTitle('Clear queue');
         if (await clearBtn.isVisible()) await clearBtn.click();
-        // Close queue panel
-        const closeBtn = window.getByTitle('Close');
+        // Close queue panel (scope to the queue header — the window titlebar also has a "Close")
+        const closeBtn = window.getByRole('banner').getByRole('button', { name: 'Close' });
         if (await closeBtn.isVisible()) await closeBtn.click();
 
         // Search and use bulk "Add to Queue"
@@ -175,7 +175,7 @@ test.describe('Collection Bulk Actions', () => {
         await expect(window.locator('text=/Processing \\d+/')).not.toBeVisible({ timeout: 10000 });
 
         // Close queue panel to avoid obscuring elements in the next test
-        const closeBtnAfter = window.getByTitle('Close');
+        const closeBtnAfter = window.getByRole('banner').getByRole('button', { name: 'Close' });
         if (await closeBtnAfter.isVisible()) {
             await closeBtnAfter.click();
             await expect(window.getByRole('heading', { name: 'Queue', level: 2 })).not.toBeVisible({ timeout: 5000 });
@@ -222,8 +222,8 @@ test.describe('Collection Bulk Actions', () => {
         await expect(queueItems.first()).toBeVisible({ timeout: 10000 });
         const initialCount = await queueItems.count();
 
-        // Close queue panel
-        await window.getByTitle('Close').click();
+        // Close queue panel (scope to the queue header — the window titlebar also has a "Close")
+        await window.getByRole('banner').getByRole('button', { name: 'Close' }).click();
 
         // Step 2: Use "Play Next" with the same search results
         await window.getByTitle('Bulk actions for current view').click();

@@ -118,6 +118,7 @@ Zustand store in `src/renderer/store/store.ts` with slices for: auth, player, qu
 - **Web Remote**: Static files in `src/assets/remote/`. Icons are injected at runtime by `RemoteService`.
 - **Simulation Mode**: `npm run dev:large` simulates 5000 items with network errors to test scalability and resilience.
 - **Scalable Collection Caching**: Large collections are persisted in SQLite with FTS5 for instant full-text search. Cache refreshes daily in the background.
+- **Collection albums have no tracks until opened**: The scraper builds collection album items with `tracks: []` (only `trackCount` is set); tracks are fetched lazily via `getAlbumDetails(bandcampUrl)` when an album is opened. Any bulk queue action (Play All / Play Next / Add to Queue in `CollectionView.handleBulkAction`) must lazy-fetch tracks per album before queueing, or the queue stays empty and playback silently no-ops. Play All fetches the first album, starts playback, then hydrates the rest sequentially (one fetch at a time, to avoid hammering Bandcamp).
 - **Chromecast Robustness**: `CastService` handles rapid reconnections and `INVALID_MEDIA_SESSION_ID` errors with automatic state recovery.
 - **Mobile Standalone Mode**: Mobile app has a native audio engine (react-native-track-player) for independent Bandcamp playback with background playback support.
 - **Hybrid Connectivity**: Mobile maintains a background WebSocket to the desktop server even in Standalone mode for seamless mode switching.
@@ -163,6 +164,7 @@ npx jest --coverage --coverageReporters="json-summary"
 - **IPC mocking**: `contextBridge` makes `window.electron` read-only — `window.evaluate` assignments silently fail. Mock at the main process level instead: `electronApp.evaluate(({ ipcMain }, data) => { ipcMain.removeHandler('channel'); ipcMain.handle('channel', async () => data); }, data)`. Then click Refresh or trigger a re-fetch to load mock data.
 - **Obstructed elements**: Elements near absolute-positioned overlays may need `{ force: true }` or `element.evaluate(el => el.click())`.
 - **Strict mode**: `getByTitle`/`getByLabel` can match multiple elements on substring. Use `{ exact: true }` or scope to parent containers.
+- **Ambiguous "Close" button**: The custom window titlebar renders a `title="Close"` button (always present), so `getByTitle('Close')` for the Queue panel trips strict mode in environments with custom window controls. Scope to the panel header instead: `getByRole('banner').getByRole('button', { name: 'Close' })` (the QueuePanel `<header>` is the banner landmark; the window titlebar is plain `<div>`s).
 - **Conditional toggling**: Check if a panel (Queue, Settings, Playlists) is already open before clicking to avoid accidentally closing it.
 - **Item counts**: Avoid hardcoding expected track counts — use `toBeGreaterThan(0)` unless mock data is fixed.
 - **V8 Coverage Merging**: When merging coverage from multiple E2E runs, ensure hits from all runs are merged. Filtering by `scriptId` across JSON files can cause 0% reporting.

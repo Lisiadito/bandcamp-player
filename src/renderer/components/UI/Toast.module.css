@@ -32,6 +32,12 @@
     }
 }
 
+.error {
+    background: rgba(55, 20, 20, 0.96);
+    border-color: rgba(255, 90, 90, 0.5);
+    color: #ffdada;
+}
+
 .icon {
     font-size: 1.1rem;
 }

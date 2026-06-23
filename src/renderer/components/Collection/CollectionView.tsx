@@ -25,6 +25,7 @@ import {
 import { ItemsGrid } from "./ItemsGrid";
 import styles from "./CollectionView.module.css";
 import { dedupeCollectionItems, sortCollectionItems } from "../../utils/collection-utils";
+import type { Album, CollectionItem } from "../../../shared/types";
 
 
 export function CollectionView() {
@@ -55,6 +56,7 @@ export function CollectionView() {
     addTracksToPlaylist,
     downloadAlbum,
     downloadTrack,
+    showToast,
   } = useStore();
 
   const isOfflineMode = settings?.offlineMode ?? false;
@@ -168,47 +170,63 @@ export function CollectionView() {
 
     setBulkProgress({ current: 0, total: sortedItems.length });
     setIsBulkOperating(true);
+
+    // Collection albums load without their tracks; fetch them lazily before queueing.
+    const hydrateAlbum = async (album: Album): Promise<Album> => {
+      if ((!album.tracks || album.tracks.length === 0) && album.bandcampUrl) {
+        const details = await getAlbumDetails(album.bandcampUrl);
+        if (details) return details;
+      }
+      return album;
+    };
+
+    // Queue a single collection item (album or track); returns how many tracks were queued.
+    const enqueueItem = async (item: CollectionItem, playNext: boolean): Promise<number> => {
+      if (item.type === 'album' && item.album) {
+        const album = await hydrateAlbum(item.album as Album);
+        if (album.tracks && album.tracks.length > 0) {
+          await addAlbumToQueue(album, playNext);
+          return album.tracks.length;
+        }
+        return 0;
+      }
+      if (item.type === 'track' && item.track) {
+        await addTracksToQueue([item.track], playNext);
+        return 1;
+      }
+      return 0;
+    };
+
     try {
       switch (action) {
         case 'play': {
           await clearQueue(false);
-          let playIndex = 0;
-          for (const item of sortedItems) {
-            setBulkProgress(p => ({ ...p, current: playIndex + 1 }));
-            if (item.type === 'album' && item.album) {
-              await addAlbumToQueue(item.album, false);
-            } else if (item.type === 'track' && item.track) {
-              await addTracksToQueue([item.track], false);
-            }
-            playIndex++;
+          let queued = 0;
+          for (const [i, item] of sortedItems.entries()) {
+            setBulkProgress(p => ({ ...p, current: i + 1 }));
+            const added = await enqueueItem(item, false);
+            // Start playback as soon as the first tracks are queued so the user
+            // isn't blocked while the rest of a large collection hydrates.
+            if (queued === 0 && added > 0) await playQueueIndex(0);
+            queued += added;
           }
-          await playQueueIndex(0);
+          if (queued === 0) {
+            showToast("Couldn't load any tracks to play", "error");
+          }
           break;
         }
         case 'playNext': {
           // Reverse to maintain order when adding "playNext" multiple times
-          let nextIndex = 0;
-          for (const item of [...sortedItems].reverse()) {
-            setBulkProgress(p => ({ ...p, current: nextIndex + 1 }));
-            if (item.type === 'album' && item.album) {
-              await addAlbumToQueue(item.album, true);
-            } else if (item.type === 'track' && item.track) {
-              await addTracksToQueue([item.track], true);
-            }
-            nextIndex++;
+          for (const [i, item] of [...sortedItems].reverse().entries()) {
+            setBulkProgress(p => ({ ...p, current: i + 1 }));
+            await enqueueItem(item, true);
           }
           break;
         }
         case 'addToQueue': {
-          let queueIndex = 0;
-          for (const item of sortedItems) {
-            setBulkProgress(p => ({ ...p, current: queueIndex + 1 }));
-            if (item.type === 'album' && item.album) {
-              await addAlbumToQueue(item.album, false);
-            } else if (item.type === 'track' && item.track) {
-              await addTracksToQueue([item.track], false);
-            }
-            queueIndex++;
+          for (const [i, item] of sortedItems.entries()) {
+            setBulkProgress(p => ({ ...p, current: i + 1 }));
+            await enqueueItem(item, false);
           }
           break;
         }
@@ -221,16 +239,7 @@ export function CollectionView() {
               if (item.type === 'track' && item.track) {
                 allTracks.push(item.track);
               } else if (item.type === 'album' && item.album) {
-                let albumWithTracks = item.album;
-                // If album has no tracks, try to fetch them
-                if (!albumWithTracks.tracks || albumWithTracks.tracks.length === 0) {
-                  if (albumWithTracks.bandcampUrl) {
-                    const details = await getAlbumDetails(albumWithTracks.bandcampUrl);
-                    if (details) {
-                      albumWithTracks = details;
-                    }
-                  }
-                }
+                const albumWithTracks = await hydrateAlbum(item.album as Album);
                 if (albumWithTracks.tracks && albumWithTracks.tracks.length > 0) {
                   allTracks.push(...albumWithTracks.tracks);
                 }
@@ -259,6 +268,7 @@ export function CollectionView() {
       }
     } catch (err) {
       console.error('Bulk action failed:', err);
+      showToast('Bulk action failed. Please try again.', 'error');
     } finally {
       setIsBulkOperating(false);
       setBulkProgress({ current: 0, total: 0 });
