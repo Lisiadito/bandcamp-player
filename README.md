@@ -60,10 +60,11 @@ Feature-rich Electron desktop application for playing Bandcamp music with fan ac
 >
 > **macOS Note ("Damaged and can't be opened")**: Because the releases are not signed with a paid Apple Developer certificate, macOS Gatekeeper may mark downloaded arm64/Intel apps with quarantine flags (`"Beta Player" is damaged and can't be opened`). To install the app, remove the quarantine attribute via Terminal:
 >
+> for Apple Disk Image (*.dmg):
 > ```bash
 > xattr -cr beta-player*.dmg
 > ```
-> and/or
+> and/or for Application file (*.app):
 > ```bash
 > xattr -cr Beta*Player.app
 > ```
